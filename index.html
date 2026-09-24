@@ -1,0 +1,676 @@
+
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CNN Medical Analyzer</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 18px;
+            padding: 30px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.08);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 2px dashed #aaa;
+            border-radius: 15px;
+            padding: 35px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            background: #f8f8f8;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .upload-label {
+            display: inline-block;
+            padding: 12px 25px;
+            border-radius: 10px;
+            background: #222;
+            color: white;
+            cursor: pointer;
+        }
+
+        #preview {
+            display: none;
+            max-width: 100%;
+            max-height: 450px;
+            margin: 20px auto;
+            border-radius: 12px;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 13px 28px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #analyzeBtn {
+            background: #222;
+            color: white;
+        }
+
+        #clearBtn {
+            background: #ddd;
+            color: #222;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 25px;
+            font-size: 18px;
+        }
+
+        #result {
+            display: none;
+            margin-top: 30px;
+            padding: 25px;
+            border-radius: 15px;
+            background: #f5f5f5;
+        }
+
+        .result-title {
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .probability {
+            margin: 12px 0;
+            font-size: 18px;
+        }
+
+        .bar {
+            height: 14px;
+            background: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s;
+        }
+
+        .pneumonia-bar {
+            background: #555;
+        }
+
+        .normal-bar {
+            background: #888;
+        }
+
+        .confidence {
+            text-align: center;
+            font-size: 20px;
+            margin-top: 25px;
+            font-weight: bold;
+        }
+
+        /* =====================================
+           GRAD-CAM
+           ===================================== */
+
+        #gradcamSection {
+            display: none;
+            margin-top: 30px;
+            padding-top: 25px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+        }
+
+        .gradcam-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .gradcam-description {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+
+        #gradcamImage {
+            display: block;
+            max-width: 100%;
+            max-height: 550px;
+            margin: 0 auto;
+            border-radius: 12px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+        }
+
+        .error {
+            color: #b00020;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 600px) {
+
+            .container {
+                margin: 15px auto;
+                padding: 10px;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            .buttons {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="card">
+
+        <h1>🫁 CNN Medical Analyzer</h1>
+
+        <div class="subtitle">
+            Аналіз рентгенівських зображень легень
+            <br>
+            EfficientNetB0
+        </div>
+
+
+        <!-- ЗАВАНТАЖЕННЯ -->
+
+        <div class="upload-area">
+
+            <label for="imageInput" class="upload-label">
+                📁 Завантажити рентген
+            </label>
+
+            <input
+                type="file"
+                id="imageInput"
+                accept="image/*"
+            >
+
+            <p id="fileName">
+                Файл не вибрано
+            </p>
+
+        </div>
+
+
+        <!-- ПОПЕРЕДНІЙ ПЕРЕГЛЯД -->
+
+        <img id="preview">
+
+
+        <!-- КНОПКИ -->
+
+        <div class="buttons">
+
+            <button
+                id="analyzeBtn"
+                disabled
+            >
+                🔍 Аналізувати
+            </button>
+
+            <button
+                id="clearBtn"
+            >
+                🗑️ Очистити
+            </button>
+
+        </div>
+
+
+        <!-- ЗАВАНТАЖЕННЯ -->
+
+        <div id="loading">
+            🔄 CNN аналізує зображення...
+        </div>
+
+
+        <!-- РЕЗУЛЬТАТ -->
+
+        <div id="result">
+
+            <div
+                id="resultTitle"
+                class="result-title"
+            >
+            </div>
+
+
+            <div class="probability">
+
+                <div>
+                    NORMAL:
+                    <strong id="normalValue">
+                        0%
+                    </strong>
+                </div>
+
+                <div class="bar">
+
+                    <div
+                        id="normalBar"
+                        class="bar-fill normal-bar"
+                    >
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="probability">
+
+                <div>
+                    PNEUMONIA:
+                    <strong id="pneumoniaValue">
+                        0%
+                    </strong>
+                </div>
+
+                <div class="bar">
+
+                    <div
+                        id="pneumoniaBar"
+                        class="bar-fill pneumonia-bar"
+                    >
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="confidence"
+                class="confidence"
+            >
+            </div>
+
+
+            <!-- =================================
+                 GRAD-CAM
+                 ================================= -->
+
+            <div id="gradcamSection">
+
+                <div class="gradcam-title">
+                    🔥 Grad-CAM
+                </div>
+
+                <div class="gradcam-description">
+                    Візуалізація області зображення,
+                    на яку звертала увагу CNN під час аналізу.
+                </div>
+
+                <img
+                    id="gradcamImage"
+                    alt="Grad-CAM visualization"
+                >
+
+            </div>
+
+        </div>
+
+
+        <div
+            id="error"
+            class="error"
+        >
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+    const imageInput =
+        document.getElementById("imageInput");
+
+    const preview =
+        document.getElementById("preview");
+
+    const analyzeBtn =
+        document.getElementById("analyzeBtn");
+
+    const clearBtn =
+        document.getElementById("clearBtn");
+
+    const fileName =
+        document.getElementById("fileName");
+
+    const loading =
+        document.getElementById("loading");
+
+    const result =
+        document.getElementById("result");
+
+    const error =
+        document.getElementById("error");
+
+    const gradcamSection =
+        document.getElementById("gradcamSection");
+
+    const gradcamImage =
+        document.getElementById("gradcamImage");
+
+
+    // =====================================
+    // ВИБІР ФАЙЛУ
+    // =====================================
+
+    imageInput.addEventListener(
+        "change",
+        function() {
+
+            const file =
+                imageInput.files[0];
+
+            if (!file) {
+                return;
+            }
+
+            fileName.textContent =
+                file.name;
+
+            const reader =
+                new FileReader();
+
+            reader.onload =
+                function(e) {
+
+                    preview.src =
+                        e.target.result;
+
+                    preview.style.display =
+                        "block";
+
+                };
+
+            reader.readAsDataURL(file);
+
+            analyzeBtn.disabled =
+                false;
+
+            result.style.display =
+                "none";
+
+            gradcamSection.style.display =
+                "none";
+
+            error.textContent =
+                "";
+
+        }
+    );
+
+
+    // =====================================
+    // АНАЛІЗ
+    // =====================================
+
+    analyzeBtn.addEventListener(
+        "click",
+        async function() {
+
+            const file =
+                imageInput.files[0];
+
+            if (!file) {
+                return;
+            }
+
+            const formData =
+                new FormData();
+
+            formData.append(
+                "image",
+                file
+            );
+
+
+            loading.style.display =
+                "block";
+
+            result.style.display =
+                "none";
+
+            gradcamSection.style.display =
+                "none";
+
+            error.textContent =
+                "";
+
+            analyzeBtn.disabled =
+                true;
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        "/predict",
+                        {
+                            method: "POST",
+                            body: formData
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.error ||
+                        "Помилка аналізу"
+                    );
+
+                }
+
+
+                // =================================
+                // РЕЗУЛЬТАТ
+                // =================================
+
+                result.style.display =
+                    "block";
+
+
+                document.getElementById(
+                    "resultTitle"
+                ).textContent =
+                    data.result;
+
+
+                document.getElementById(
+                    "normalValue"
+                ).textContent =
+                    data.normal + "%";
+
+
+                document.getElementById(
+                    "pneumoniaValue"
+                ).textContent =
+                    data.pneumonia + "%";
+
+
+                document.getElementById(
+                    "normalBar"
+                ).style.width =
+                    data.normal + "%";
+
+
+                document.getElementById(
+                    "pneumoniaBar"
+                ).style.width =
+                    data.pneumonia + "%";
+
+
+                document.getElementById(
+                    "confidence"
+                ).textContent =
+                    "Впевненість моделі: " +
+                    data.confidence +
+                    "%";
+
+
+                // =================================
+                // GRAD-CAM
+                // =================================
+
+                if (data.gradcam) {
+
+                    gradcamImage.src =
+                        "data:image/jpeg;base64," +
+                        data.gradcam;
+
+                    gradcamSection.style.display =
+                        "block";
+
+                }
+
+
+            } catch (err) {
+
+                error.textContent =
+                    "❌ " + err.message;
+
+            }
+
+
+            loading.style.display =
+                "none";
+
+            analyzeBtn.disabled =
+                false;
+
+        }
+    );
+
+
+    // =====================================
+    // ОЧИЩЕННЯ
+    // =====================================
+
+    clearBtn.addEventListener(
+        "click",
+        function() {
+
+            imageInput.value =
+                "";
+
+            preview.src =
+                "";
+
+            preview.style.display =
+                "none";
+
+            fileName.textContent =
+                "Файл не вибрано";
+
+            result.style.display =
+                "none";
+
+            gradcamSection.style.display =
+                "none";
+
+            gradcamImage.src =
+                "";
+
+            error.textContent =
+                "";
+
+            analyzeBtn.disabled =
+                true;
+
+            document.getElementById(
+                "normalBar"
+            ).style.width =
+                "0%";
+
+            document.getElementById(
+                "pneumoniaBar"
+            ).style.width =
+                "0%";
+
+        }
+    );
+
+</script>
+
+</body>
+</html>
