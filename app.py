@@ -26,7 +26,6 @@ model = tf.keras.models.load_model(MODEL_PATH)
 
 print("Модель успішно завантажена!")
 
-
 # ==========================================
 # ОТРИМУЄМО ВНУТРІШНЮ EfficientNetB0
 # ==========================================
@@ -39,9 +38,8 @@ print("Внутрішня EfficientNetB0 знайдена!")
 print("Grad-CAM шар:", last_conv_layer.name)
 print("Форма Grad-CAM шару:", last_conv_layer.output.shape)
 
-
 # ==========================================
-# СТВОРЮЄМО ОКРЕМУ МОДЕЛЬ ДЛЯ GRAD-CAM
+# СТВОРЮЄМО МОДЕЛЬ ДЛЯ GRAD-CAM
 # ==========================================
 
 gradcam_backbone = tf.keras.Model(
@@ -55,7 +53,6 @@ gradcam_backbone = tf.keras.Model(
 
 print("Модель для Grad-CAM створена!")
 
-
 # ==========================================
 # ГОЛОВНА СТОРІНКА
 # ==========================================
@@ -64,11 +61,9 @@ print("Модель для Grad-CAM створена!")
 def index():
     return send_file("index.html")
 
-
 # ==========================================
-# GRAD-CAM
+# ПРОГНОЗ + GRAD-CAM
 # ==========================================
-
 
 def make_gradcam(image_array):
 
@@ -132,53 +127,11 @@ def make_gradcam(image_array):
 
     return heatmap.numpy(), pneumonia_probability
 
-        
-
-    if gradients is None:
-        raise ValueError(
-            "Grad-CAM не зміг отримати градієнти."
-        )
-
-    pooled_gradients = tf.reduce_mean(
-        gradients,
-        axis=(1, 2)
-    )
-
-    conv_outputs = conv_outputs[0]
-
-    pooled_gradients = pooled_gradients[0]
-
-    heatmap = tf.reduce_sum(
-        conv_outputs * pooled_gradients,
-        axis=-1
-    )
-
-    heatmap = tf.maximum(
-        heatmap,
-        0
-    )
-
-    max_value = tf.reduce_max(
-        heatmap
-    )
-
-    heatmap = tf.where(
-        max_value > 0,
-        heatmap / max_value,
-        heatmap
-    )
-
-    return heatmap.numpy()
-
-
 # ==========================================
 # СТВОРЕННЯ ЗОБРАЖЕННЯ GRAD-CAM
 # ==========================================
 
-def create_gradcam_image(
-    original_image,
-    heatmap
-):
+def create_gradcam_image(original_image, heatmap):
 
     width, height = original_image.size
 
@@ -213,9 +166,7 @@ def create_gradcam_image(
         0
     )
 
-    result_image = Image.fromarray(
-        overlay
-    )
+    result_image = Image.fromarray(overlay)
 
     buffer = BytesIO()
 
@@ -231,19 +182,14 @@ def create_gradcam_image(
 
     return encoded
 
-
 # ==========================================
-# АНАЛІЗ
+# АНАЛІЗ ЗОБРАЖЕННЯ
 # ==========================================
 
-@app.route(
-    "/predict",
-    methods=["POST"]
-)
+@app.route("/predict", methods=["POST"])
 def predict():
 
     if "image" not in request.files:
-
         return jsonify({
             "error": "Зображення не завантажено"
         }), 400
@@ -251,29 +197,19 @@ def predict():
     file = request.files["image"]
 
     if file.filename == "":
-
         return jsonify({
             "error": "Файл не вибрано"
         }), 400
 
     try:
 
-        # ==================================
+        print("Початок аналізу...")
+
         # ОРИГІНАЛ
-        # ==================================
+        image = Image.open(file).convert("RGB")
 
-        image = Image.open(
-            file
-        ).convert("RGB")
-
-
-        # ==================================
         # ПІДГОТОВКА ДЛЯ МОДЕЛІ
-        # ==================================
-
-        image_resized = image.resize(
-            IMG_SIZE
-        )
+        image_resized = image.resize(IMG_SIZE)
 
         img_array = np.array(
             image_resized,
@@ -285,44 +221,31 @@ def predict():
             axis=0
         )
 
+        # ПРОГНОЗ + GRAD-CAM ЗА ОДИН ПРОХІД
+        heatmap, pneumonia_probability = make_gradcam(
+            img_array
+        )
 
-        
-# ==================================
-# ПРОГНОЗ + GRAD-CAM
-# ==================================
+        normal_probability = 1.0 - pneumonia_probability
 
-print("Початок аналізу...")
+        if pneumonia_probability >= 0.5:
+            result = "PNEUMONIA"
+            confidence = pneumonia_probability
+        else:
+            result = "NORMAL"
+            confidence = normal_probability
 
-heatmap, pneumonia_probability = make_gradcam(
-    img_array
-)
+        print("Прогноз створено!")
 
-normal_probability = 1.0 - pneumonia_probability
-
-if pneumonia_probability >= 0.5:
-    result = "PNEUMONIA"
-    confidence = pneumonia_probability
-else:
-    result = "NORMAL"
-    confidence = normal_probability
-
-print("Прогноз створено!")
-
-gradcam_image = create_gradcam_image(
-    image,
-    heatmap
-)
-
-print("Grad-CAM успішно створено!")
-
+        # СТВОРЕННЯ GRAD-CAM
+        gradcam_image = create_gradcam_image(
+            image,
+            heatmap
+        )
 
         print("Grad-CAM успішно створено!")
 
-
-        # ==================================
-        # РЕЗУЛЬТАТ
-        # ==================================
-
+        # ПОВЕРНЕННЯ РЕЗУЛЬТАТУ
         return jsonify({
 
             "result": result,
@@ -346,7 +269,6 @@ print("Grad-CAM успішно створено!")
 
         })
 
-
     except Exception as e:
 
         print(
@@ -357,7 +279,6 @@ print("Grad-CAM успішно створено!")
         return jsonify({
             "error": str(e)
         }), 500
-
 
 # ==========================================
 # ЗАПУСК
