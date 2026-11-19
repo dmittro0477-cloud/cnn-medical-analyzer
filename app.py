@@ -69,6 +69,7 @@ def index():
 # GRAD-CAM
 # ==========================================
 
+
 def make_gradcam(image_array):
 
     with tf.GradientTape() as tape:
@@ -78,8 +79,6 @@ def make_gradcam(image_array):
             training=False
         )
 
-        # Повторюємо ті самі наступні шари,
-        # які використовує основна модель.
         x = model.get_layer(
             "global_average_pooling2d"
         )(backbone_output)
@@ -98,6 +97,42 @@ def make_gradcam(image_array):
         score,
         conv_outputs
     )
+
+    if gradients is None:
+        raise ValueError(
+            "Grad-CAM не зміг отримати градієнти."
+        )
+
+    pooled_gradients = tf.reduce_mean(
+        gradients,
+        axis=(1, 2)
+    )
+
+    conv_outputs = conv_outputs[0]
+    pooled_gradients = pooled_gradients[0]
+
+    heatmap = tf.reduce_sum(
+        conv_outputs * pooled_gradients,
+        axis=-1
+    )
+
+    heatmap = tf.maximum(heatmap, 0)
+
+    max_value = tf.reduce_max(heatmap)
+
+    heatmap = tf.where(
+        max_value > 0,
+        heatmap / max_value,
+        heatmap
+    )
+
+    pneumonia_probability = float(
+        prediction[0][0].numpy()
+    )
+
+    return heatmap.numpy(), pneumonia_probability
+
+        
 
     if gradients is None:
         raise ValueError(
