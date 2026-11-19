@@ -13,7 +13,7 @@ app = Flask(__name__)
 # НАЛАШТУВАННЯ
 # ==========================================
 
-MODEL_PATH = "models/efficientnetb0_pneumonia_finetuned.keras"
+MODEL_PATH = "efficientnetb0_pneumonia_finetuned.keras"
 IMG_SIZE = (224, 224)
 
 # ==========================================
