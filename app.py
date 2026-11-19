@@ -1,5 +1,5 @@
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, send_file
 import tensorflow as tf
 from PIL import Image
 import numpy as np
@@ -62,7 +62,7 @@ print("Модель для Grad-CAM створена!")
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return send_file("index.html")
 
 
 # ==========================================
