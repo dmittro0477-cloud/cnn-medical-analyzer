@@ -286,50 +286,35 @@ def predict():
         )
 
 
-        # ==================================
-        # ЗВИЧАЙНИЙ ПРОГНОЗ
-        # ==================================
+        
+# ==================================
+# ПРОГНОЗ + GRAD-CAM
+# ==================================
 
-        prediction = model.predict(
-            img_array,
-            verbose=0
-        )[0][0]
+print("Початок аналізу...")
 
-        pneumonia_probability = float(
-            prediction
-        )
+heatmap, pneumonia_probability = make_gradcam(
+    img_array
+)
 
-        normal_probability = (
-            1.0 -
-            pneumonia_probability
-        )
+normal_probability = 1.0 - pneumonia_probability
 
+if pneumonia_probability >= 0.5:
+    result = "PNEUMONIA"
+    confidence = pneumonia_probability
+else:
+    result = "NORMAL"
+    confidence = normal_probability
 
-        if pneumonia_probability >= 0.5:
+print("Прогноз створено!")
 
-            result = "PNEUMONIA"
-            confidence = pneumonia_probability
+gradcam_image = create_gradcam_image(
+    image,
+    heatmap
+)
 
-        else:
+print("Grad-CAM успішно створено!")
 
-            result = "NORMAL"
-            confidence = normal_probability
-
-
-        # ==================================
-        # GRAD-CAM
-        # ==================================
-
-        print("Створення Grad-CAM...")
-
-        heatmap = make_gradcam(
-            img_array
-        )
-
-        gradcam_image = create_gradcam_image(
-            image,
-            heatmap
-        )
 
         print("Grad-CAM успішно створено!")
 
