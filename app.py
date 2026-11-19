@@ -1,5 +1,5 @@
 
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, jsonify
 import tensorflow as tf
 from PIL import Image
 import numpy as np
